@@ -15,11 +15,11 @@ class SearchBodyBuild():
         self.query_build.add_condition('range', field, (start, end))
         return self
 
-    def groupby(self, field):
+    def groupby(self, field, do_nest=True):
         self.aggs_build.update_aggs(field)
         return self
 
-    def groupby_date(self, date_field, interval):
+    def groupby_date(self, date_field, interval, do_nest=True):
         self.aggs_build.update_aggs((date_field, interval), 'date_histogram')
         return self
 
