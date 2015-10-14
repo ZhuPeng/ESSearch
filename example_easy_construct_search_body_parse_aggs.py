@@ -8,11 +8,11 @@ body_build = SearchBodyBuild()
 end = datetime.datetime.now()
 start = end - datetime.timedelta(days=10)
 
-body = body_build.select_range('time', start, end)\
-                 .select_must('ip', '10.10.0.0')\
+body = body_build.range('time', start, end)\
+                 .must('ip', '10.10.0.0')\
                  .groupby_date('time', '1d')\
                  .groupby('domain')\
-                 .add_metric('pv', 'sum')\
+                 .sum('pv')\
                  .get_body()
 
 print body
@@ -84,7 +84,7 @@ for time_bucket in pre_aggs.get_buckets('time'):
         print '\tkey:', domain_bucket.get_key()
         print '\tdoc_count:', domain_bucket.get_doc_count()
 
-        print '\tmetric value:', domain_bucket.get_metric_value('pv')
+        print '\tmetric value:', domain_bucket.get_sum('pv')
 
         # raise an Exception: Do not exists this aggregation field
         # domain_bucket.get_buckets('xx')

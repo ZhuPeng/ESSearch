@@ -6,11 +6,11 @@ from esearch import parse_aggs
 class Test_ParseAggs(unittest.TestCase):
     def setUp(self):
         self.body_build = SearchBodyBuild()
-        self.body_build.select_range('time', 'start', 'end')\
-                       .select_must('ip', '10.10.0.0')\
+        self.body_build.range('time', 'start', 'end')\
+                       .must('ip', '10.10.0.0')\
                        .groupby_date('time', '1d')\
                        .groupby('domain')\
-                       .add_metric('pv', 'sum')
+                       .sum('pv')
 
         self.res = {
             'hits': {},
@@ -75,4 +75,7 @@ class Test_ParseAggs(unittest.TestCase):
             for domain_bucket in time_bucket.get_buckets('domain'):
                 self.assertEqual(domain_bucket.get_key(), 'www.xxxx.com')
                 self.assertEqual(domain_bucket.get_doc_count(), 1000)
-                self.assertEqual(domain_bucket.get_metric_value('pv'), 2000)
+                self.assertEqual(domain_bucket.get_sum('pv'), 2000)
+
+                with self.assertRaises(Exception):
+                    domain_bucket.get_buckets('xxxxx')

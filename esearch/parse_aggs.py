@@ -24,6 +24,7 @@ class Bucket():
     def __init__(self, aggs_build, bucket):
         self.aggs_build = aggs_build
         self.bucket = bucket
+        self._create_get_metric_func()
 
     def get_key_as_string(self):
         if 'key_as_string' not in self.bucket:
@@ -36,23 +37,25 @@ class Bucket():
     def get_doc_count(self):
         return self.bucket['doc_count']
 
-    def _child_aggs_exists(func):
-        def check(self, field):
-            if self.aggs_build.is_field_aggs(field):
-                return func(self, field)
-            else:
-                raise Exception('Aggregation of "%s" not exists in this bucket.' % field)
-        return check
+    def _check_field(self, field):
+        if not self.aggs_build.is_field_aggs(field):
+            raise Exception('Aggregation of "%s" not exists in this bucket.' % field)
 
-    @_child_aggs_exists
     def get_buckets(self, field):
+        self._check_field(field)
         return AggsBody(self.aggs_build, self.bucket).get_buckets(field)
 
-    @_child_aggs_exists
-    def get_metric_value(self, field):
-        '''Get metric value'''
-        aggs_name = self.aggs_build.get_aggs_name(field)
-        return self.bucket[aggs_name]['value']
+    def _create_get_metric_func(self):
+        def get_metric_func(aggs_type):
+            def template(self, field):
+                self._check_field(field)
+                aggs_name = self.aggs_build.get_aggs_name(field, aggs_type)
+                return self.bucket[aggs_name]['value']
+            return template
+
+        for metric in AggregationBuild.metric_set:
+            setattr(self.__class__, 'get_'+metric, get_metric_func(metric))
+        setattr(self.__class__, 'get_count', get_metric_func('cardinality'))
 
 
 if __name__ == '__main__':

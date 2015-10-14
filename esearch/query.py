@@ -2,16 +2,17 @@ class SearchBodyBuild():
     def __init__(self):
         self.query_build = QueryBuild()
         self.aggs_build = AggregationBuild()
+        self._create_add_metric_func()
 
-    def select_must(self, field, value):
+    def must(self, field, value):
         self.query_build.add_condition('must', field, value)
         return self
 
-    def select_should(self, field, value):
+    def should(self, field, value):
         self.query_build.add_condition('should', field, value)
         return self
 
-    def select_range(self, field, start, end):
+    def range(self, field, start, end):
         self.query_build.add_condition('range', field, (start, end))
         return self
 
@@ -23,9 +24,16 @@ class SearchBodyBuild():
         self.aggs_build.update_aggs((date_field, interval), 'date_histogram')
         return self
 
-    def add_metric(self, field, aggs_type, do_nest=False):
-        self.aggs_build.update_aggs(field, aggs_type, do_nest)
-        return self
+    def _create_add_metric_func(self):
+        def metric_func(aggs_type):
+            def template(self, field, do_nest=False):
+                self.aggs_build.update_aggs(field, aggs_type, do_nest)
+                return self
+            return template
+
+        for metric in AggregationBuild.metric_set:
+            setattr(self.__class__, metric, metric_func(metric))
+        setattr(self.__class__, 'count', metric_func('cardinality'))
 
     def get_body(self):
         self.body = {}
@@ -92,8 +100,18 @@ class AggregationBuild():
     def is_field_aggs(self, field):
         return field in self.aggs_type_dict
 
-    def get_aggs_name(self, field):
-        return field + AggregationBuild.name_sep + self.aggs_type_dict[field]
+    def get_aggs_name(self, field, aggs_type=None):
+        if not aggs_type:
+            aggs_type = self.aggs_type_dict[field]
+            if len(aggs_type) > 1:
+                raise Exception('There exists multi aggregation type work on this field, please select a certain one.')
+            aggs_type = aggs_type[0]
+        return field + AggregationBuild.name_sep + aggs_type
+
+    def keep_field_aggs_type(self, field, aggs_type):
+        if field not in self.aggs_type_dict:
+            self.aggs_type_dict[field] = []
+        self.aggs_type_dict[field].append(aggs_type)
 
     def _build_metric(self, field, metric):
         return {metric: {'field': field}}
@@ -117,10 +135,10 @@ class AggregationBuild():
 
         if type(field) is tuple:
             new_aggs_name = field[0] + self.name_sep + aggs_type
-            self.aggs_type_dict[field[0]] = aggs_type
+            self.keep_field_aggs_type(field[0], aggs_type)
         else:
             new_aggs_name = field + self.name_sep + aggs_type
-            self.aggs_type_dict[field] = aggs_type
+            self.keep_field_aggs_type(field, aggs_type)
 
         new_aggs_body = getattr(self, '_build_'+build_func_sufix)(field, aggs_type)
         self._update_aggs_body(new_aggs_name, new_aggs_body, do_nest)
